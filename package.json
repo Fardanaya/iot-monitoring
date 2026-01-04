@@ -1,0 +1,31 @@
+{
+  "name": "monitoring",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "client": "node client/device.js",
+    "seed": "node seed-devices.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "iot",
+    "monitoring",
+    "real-time",
+    "jwt",
+    "tcp",
+    "websocket"
+  ],
+  "author": "",
+  "license": "Franky",
+  "description": "Real-time IoT device monitoring system with JWT authentication, TCP data transmission, and WebSocket dashboard. Features SQLite database for device management and bcrypt password hashing.",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.8.1",
+    "dotenv": "^16.4.7",
+    "jsonwebtoken": "^9.0.3",
+    "systeminformation": "^5.28.10",
+    "ws": "^8.18.3"
+  }
+}
