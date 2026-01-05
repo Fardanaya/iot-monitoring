@@ -50,18 +50,30 @@ export const tcpServer = net.createServer((socket) => {
                 // Store device by device_id, not socket
                 currentDeviceId = msg.device_id;
 
-                // Check if device already exists and close old connection
+                // Check if device already exists with a DIFFERENT socket and close old connection
                 if (deviceList.has(currentDeviceId)) {
                     const oldDevice = deviceList.get(currentDeviceId);
-                    console.log(`Device ${currentDeviceId} reconnecting. Closing old connection from ${oldDevice.clientAddress}`);
-                    oldDevice.socket.destroy();
-                }
+                    // Only close old connection if it's a different socket (actual reconnection)
+                    if (oldDevice.socket !== socket) {
+                        console.log(`Device ${currentDeviceId} reconnecting. Closing old connection from ${oldDevice.clientAddress}`);
+                        oldDevice.socket.destroy();
 
-                deviceList.set(currentDeviceId, {
-                    socket,
-                    decoded,
-                    clientAddress
-                });
+                        // Update with new socket
+                        deviceList.set(currentDeviceId, {
+                            socket,
+                            decoded,
+                            clientAddress
+                        });
+                    }
+                    // Otherwise, it's the same socket sending more data - do nothing
+                } else {
+                    // New device connection
+                    deviceList.set(currentDeviceId, {
+                        socket,
+                        decoded,
+                        clientAddress
+                    });
+                }
 
                 console.log(`Data received from device: ${msg.device_id} (${clientAddress})`);
                 console.log(`Active devices: ${deviceList.size}`);
