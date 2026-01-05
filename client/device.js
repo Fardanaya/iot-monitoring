@@ -105,7 +105,8 @@ async function sendSensorData() {
             device_name,
             token,
             payload
-        }));
+        }) + '\n');
+
 
         console.log(`Sent data - CPU: ${payload.cpu}%, RAM: ${payload.ram}%, Temp: ${payload.temp}°C`);
 

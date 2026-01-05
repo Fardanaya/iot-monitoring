@@ -2,45 +2,76 @@ import net from "net";
 import { verifyToken } from "./auth.js";
 import { broadcast } from "./wsServer.js";
 
-const deviceList = new Map();
+const deviceList = new Map(); // Map<device_id, {socket, decoded, clientAddress}>
 
 export const tcpServer = net.createServer((socket) => {
     const clientAddress = `${socket.remoteAddress}:${socket.remotePort}`;
     console.log(`New connection from ${clientAddress}`);
 
+    let dataBuffer = '';
+    let currentDeviceId = null;
+
     socket.on('data', buffer => {
         try {
-            const msg = JSON.parse(buffer.toString());
+            dataBuffer += buffer.toString();
 
-            const decoded = verifyToken(msg.token);
+            // Split by newline to handle multiple messages
+            const messages = dataBuffer.split('\n');
 
-            if (!decoded || !decoded.device_id) {
-                console.log(`Authentication failed from ${clientAddress} - Invalid token`);
-                socket.write(JSON.stringify({
-                    error: "Authentication failed - Invalid token"
-                }));
-                socket.destroy();
-                return;
+            // Keep the last incomplete message in buffer
+            dataBuffer = messages.pop();
+
+            // Process each complete message
+            for (const msgStr of messages) {
+                if (!msgStr.trim()) continue;
+
+                const msg = JSON.parse(msgStr);
+
+                const decoded = verifyToken(msg.token);
+
+                if (!decoded || !decoded.device_id) {
+                    console.log(`Authentication failed from ${clientAddress} - Invalid token`);
+                    socket.write(JSON.stringify({
+                        error: "Authentication failed - Invalid token"
+                    }) + '\n');
+                    socket.destroy();
+                    return;
+                }
+
+                if (msg.device_id !== decoded.device_id) {
+                    console.log(`Device ID mismatch from ${clientAddress} - Token: ${decoded.device_id}, Sent: ${msg.device_id}`);
+                    socket.write(JSON.stringify({
+                        error: "Device ID mismatch"
+                    }) + '\n');
+                    socket.destroy();
+                    return;
+                }
+
+                // Store device by device_id, not socket
+                currentDeviceId = msg.device_id;
+
+                // Check if device already exists and close old connection
+                if (deviceList.has(currentDeviceId)) {
+                    const oldDevice = deviceList.get(currentDeviceId);
+                    console.log(`Device ${currentDeviceId} reconnecting. Closing old connection from ${oldDevice.clientAddress}`);
+                    oldDevice.socket.destroy();
+                }
+
+                deviceList.set(currentDeviceId, {
+                    socket,
+                    decoded,
+                    clientAddress
+                });
+
+                console.log(`Data received from device: ${msg.device_id} (${clientAddress})`);
+                console.log(`Active devices: ${deviceList.size}`);
+
+                broadcast({
+                    device_id: msg.device_id,
+                    device_name: msg.device_name || msg.device_id,
+                    data: msg.payload
+                });
             }
-
-            if (msg.device_id !== decoded.device_id) {
-                console.log(`Device ID mismatch from ${clientAddress} - Token: ${decoded.device_id}, Sent: ${msg.device_id}`);
-                socket.write(JSON.stringify({
-                    error: "Device ID mismatch"
-                }));
-                socket.destroy();
-                return;
-            }
-
-            deviceList.set(socket, decoded);
-
-            console.log(`Data received from device: ${msg.device_id}`);
-
-            broadcast({
-                device_id: msg.device_id,
-                device_name: msg.device_name || msg.device_id,
-                data: msg.payload
-            });
 
         } catch (error) {
             console.error(`Error processing data from ${clientAddress}:`, error.message);
@@ -49,16 +80,14 @@ export const tcpServer = net.createServer((socket) => {
     });
 
     socket.on('close', () => {
-        let removedDevice = null;
-        deviceList.forEach((value, key) => {
-            if (key === socket) {
-                removedDevice = value.device_id;
-                deviceList.delete(key);
+        if (currentDeviceId && deviceList.has(currentDeviceId)) {
+            const device = deviceList.get(currentDeviceId);
+            // Only remove if this socket is the current one for this device
+            if (device.socket === socket) {
+                deviceList.delete(currentDeviceId);
+                console.log(`Device disconnected: ${currentDeviceId} (${clientAddress})`);
+                console.log(`Active devices: ${deviceList.size}`);
             }
-        });
-
-        if (removedDevice) {
-            console.log(`Device disconnected: ${removedDevice} (${clientAddress})`);
         } else {
             console.log(`Connection closed: ${clientAddress}`);
         }
