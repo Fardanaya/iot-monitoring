@@ -14,7 +14,6 @@ httpServer.listen(HTTP_PORT, () => {
     console.log(`API endpoints:`);
     console.log(`  - POST http://localhost:${HTTP_PORT}/api/login`);
     console.log(`  - GET  http://localhost:${HTTP_PORT}/api/devices`);
-    console.log(`  - GET  http://localhost:${HTTP_PORT}/api/devices/active`);
     console.log(`  - GET  http://localhost:${HTTP_PORT}/api/metrics/:id/latest`);
 });
 
