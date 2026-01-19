@@ -1,6 +1,7 @@
 import net from "net";
 import { verifyToken } from "./auth.js";
 import { broadcast } from "./wsServer.js";
+import { saveMetrics } from "./database.js";
 
 const deviceList = new Map(); // Map<device_id, {socket, decoded, clientAddress}>
 
@@ -77,6 +78,9 @@ export const tcpServer = net.createServer((socket) => {
 
                 console.log(`Data received from device: ${msg.device_id} (${clientAddress})`);
                 console.log(`Active devices: ${deviceList.size}`);
+
+                // Save metrics to database
+                saveMetrics(msg.device_id, msg.payload);
 
                 broadcast({
                     device_id: msg.device_id,

@@ -20,6 +20,25 @@ db.exec(`
     )
 `);
 
+db.exec(`
+    CREATE TABLE IF NOT EXISTS monitoring (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        device_id TEXT NOT NULL,
+        cpu REAL NOT NULL,
+        ram REAL NOT NULL,
+        temp REAL NOT NULL,
+        battery REAL NOT NULL,
+        timestamp TEXT NOT NULL,
+        FOREIGN KEY (device_id) REFERENCES devices(device_id) ON DELETE CASCADE
+    )
+`);
+
+db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_monitoring_device_id ON monitoring(device_id);
+    CREATE INDEX IF NOT EXISTS idx_monitoring_timestamp ON monitoring(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_monitoring_device_timestamp ON monitoring(device_id, timestamp DESC);
+`);
+
 export function verifyDeviceCredentials(device_id, password) {
     const device = db.prepare(`
         SELECT password_hash, is_active 
@@ -68,6 +87,57 @@ export function getAllDevices() {
         FROM devices
         ORDER BY created_at DESC
     `).all();
+}
+
+export function saveMetrics(device_id, metrics) {
+    try {
+        db.prepare(`
+            INSERT INTO monitoring (device_id, cpu, ram, temp, battery, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `).run(
+            device_id,
+            parseFloat(metrics.cpu),
+            parseFloat(metrics.ram),
+            parseFloat(metrics.temp),
+            parseFloat(metrics.battery),
+            metrics.timestamp || new Date().toISOString()
+        );
+        return { success: true };
+    } catch (error) {
+        console.error('Error saving monitoring data:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+export function getLatestMetrics(device_id, limit = 100) {
+    return db.prepare(`
+        SELECT cpu, ram, temp, battery, timestamp
+        FROM monitoring
+        WHERE device_id = ?
+        ORDER BY timestamp DESC
+        LIMIT ?
+    `).all(device_id, limit);
+}
+
+export function getMetricsInRange(device_id, startTime, endTime) {
+    return db.prepare(`
+        SELECT cpu, ram, temp, battery, timestamp
+        FROM monitoring
+        WHERE device_id = ? AND timestamp >= ? AND timestamp <= ?
+        ORDER BY timestamp ASC
+    `).all(device_id, startTime, endTime);
+}
+
+export function deleteOldMetrics(daysToKeep = 7) {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+
+    const result = db.prepare(`
+        DELETE FROM monitoring
+        WHERE timestamp < ?
+    `).run(cutoffDate.toISOString());
+
+    return { deleted: result.changes };
 }
 
 export { db };
