@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { generateToken } from "./auth.js";
 import { verifyDeviceCredentials, getDeviceInfo, getAllDevices, getLatestMetrics, getMetricsInRange } from "./database.js";
+import { getActiveDevices } from "./tcpServer.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -83,6 +84,30 @@ export const httpServer = http.createServer((req, res) => {
             }));
         } catch (error) {
             console.error("Error fetching devices:", error);
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({
+                error: "Internal server error"
+            }));
+        }
+
+    } else if (req.method === "GET" && req.url === "/api/devices/active") {
+        try {
+            const activeDeviceIds = getActiveDevices();
+            const allDevices = getAllDevices();
+
+            // Filter to only return devices that are currently connected
+            const activeDevices = allDevices.filter(device =>
+                activeDeviceIds.includes(device.device_id)
+            );
+
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({
+                success: true,
+                devices: activeDevices,
+                count: activeDevices.length
+            }));
+        } catch (error) {
+            console.error("Error fetching active devices:", error);
             res.writeHead(500, { "Content-Type": "application/json" });
             res.end(JSON.stringify({
                 error: "Internal server error"

@@ -46,11 +46,12 @@ function updateConnectionStatus(connected) {
 
 async function loadDevicesAndHistory() {
     try {
-        const response = await fetch('http://localhost:3000/api/devices');
+        // Only load active/connected devices
+        const response = await fetch('http://localhost:3000/api/devices/active');
         const result = await response.json();
 
         if (!result.success || !result.devices || result.devices.length === 0) {
-            console.log('No devices found in database');
+            console.log('No active devices found');
             return;
         }
 

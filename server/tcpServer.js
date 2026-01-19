@@ -113,3 +113,8 @@ export const tcpServer = net.createServer((socket) => {
         console.error(`Socket error from ${clientAddress}:`, error.message);
     });
 });
+
+// Export function to get active devices
+export function getActiveDevices() {
+    return Array.from(deviceList.keys());
+}
